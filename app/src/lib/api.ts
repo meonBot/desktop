@@ -15,6 +15,13 @@ import username from 'username'
 import { GitProtocol } from './remote-parsing'
 
 const envEndpoint = process.env['DESKTOP_GITHUB_DOTCOM_API_ENDPOINT']
+const envHTMLURL = process.env['DESKTOP_GITHUB_DOTCOM_HTML_URL']
+const envAdditionalCookies =
+  process.env['DESKTOP_GITHUB_DOTCOM_ADDITIONAL_COOKIES']
+
+if (envAdditionalCookies !== undefined) {
+  document.cookie += '; ' + envAdditionalCookies
+}
 
 /**
  * Optional set of configurable settings for the fetchAll method
@@ -103,6 +110,18 @@ export interface IAPIRepository {
   readonly pushed_at: string
   readonly has_issues: boolean
   readonly archived: boolean
+}
+
+/** Information needed to clone a repository. */
+export interface IAPIRepositoryCloneInfo {
+  /** Canonical clone URL of the repository. */
+  readonly url: string
+
+  /**
+   * Default branch of the repository, if any. This is usually either retrieved
+   * from the API for GitHub repositories, or undefined for other repositories.
+   */
+  readonly defaultBranch?: string
 }
 
 export interface IAPIFullRepository extends IAPIRepository {
@@ -590,8 +609,11 @@ export class API {
   }
 
   /**
-   * Fetch the canonical clone URL for a repository, respecting the protocol
-   * preference if provided.
+   * Fetch info needed to clone a repository. That includes:
+   *  - The canonical clone URL for a repository, respecting the protocol
+   *    preference if provided.
+   *  - The default branch of the repository, in case the repository is empty.
+   *    Only available for GitHub repositories.
    *
    * Returns null if the request returned a 404 (NotFound). NotFound doesn't
    * necessarily mean that the repository doesn't exist, it could exist and
@@ -606,19 +628,25 @@ export class API {
    * @param name     The repository name (node in https://github.com/nodejs/node)
    * @param protocol The preferred Git protocol (https or ssh)
    */
-  public async fetchRepositoryCloneUrl(
+  public async fetchRepositoryCloneInfo(
     owner: string,
     name: string,
     protocol: GitProtocol | undefined
-  ): Promise<string | null> {
-    const response = await this.request('GET', `repos/${owner}/${name}`)
+  ): Promise<IAPIRepositoryCloneInfo | null> {
+    const response = await this.requestReloadCache(
+      'GET',
+      `repos/${owner}/${name}`
+    )
 
     if (response.status === HttpStatusCode.NotFound) {
       return null
     }
 
     const repo = await parsedResponse<IAPIRepository>(response)
-    return protocol === 'ssh' ? repo.ssh_url : repo.clone_url
+    return {
+      url: protocol === 'ssh' ? repo.ssh_url : repo.clone_url,
+      defaultBranch: repo.default_branch,
+    }
   }
 
   /** Fetch all repos a user has access to. */
@@ -1002,6 +1030,25 @@ export class API {
     return request(this.endpoint, this.token, method, path, body, customHeaders)
   }
 
+  /** Make an authenticated request to the client's endpoint with its token but
+   * skip checking cache while also updating cache. */
+  private requestReloadCache(
+    method: HTTPMethod,
+    path: string,
+    body?: Object,
+    customHeaders?: Object
+  ): Promise<Response> {
+    return request(
+      this.endpoint,
+      this.token,
+      method,
+      path,
+      body,
+      customHeaders,
+      true
+    )
+  }
+
   /**
    * Get the allowed poll interval for fetching. If an error occurs it will
    * return null.
@@ -1307,6 +1354,10 @@ export function getEndpointForRepository(url: string): string {
  * http://github.mycompany.com/api -> http://github.mycompany.com/
  */
 export function getHTMLURL(endpoint: string): string {
+  if (envHTMLURL !== undefined) {
+    return envHTMLURL
+  }
+
   // In the case of GitHub.com, the HTML site lives on the parent domain.
   //  E.g., https://api.github.com -> https://github.com
   //

@@ -47,7 +47,7 @@ export class AppWindow {
         disableBlinkFeatures: 'Auxclick',
         nodeIntegration: true,
         enableRemoteModule: true,
-        spellcheck: false,
+        spellcheck: true,
       },
       acceptFirstMouse: true,
     }
@@ -81,7 +81,7 @@ export class AppWindow {
       this.window.on('close', e => {
         if (!quitting) {
           e.preventDefault()
-          Menu.sendActionToFirstResponder('hide:')
+          app.hide()
         }
       })
     }
@@ -211,6 +211,9 @@ export class AppWindow {
   public show() {
     this.window.show()
     if (this.shouldMaximizeOnShow) {
+      // Only maximize the window the first time it's shown, not every time.
+      // Otherwise, it causes the problem described in desktop/desktop#11590
+      this.shouldMaximizeOnShow = false
       this.window.maximize()
     }
   }

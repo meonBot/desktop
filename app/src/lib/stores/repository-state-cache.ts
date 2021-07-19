@@ -18,6 +18,9 @@ import {
   ICommitSelection,
   IRebaseState,
   ChangesSelectionKind,
+  ICherryPickState,
+  IMultiCommitOperationUndoState,
+  IMultiCommitOperationState,
 } from '../app-state'
 import { merge } from '../merge'
 import { DefaultCommitMessage } from '../../models/commit-message'
@@ -43,7 +46,24 @@ export class RepositoryStateCache {
   ) {
     const currentState = this.get(repository)
     const newValues = fn(currentState)
-    this.repositoryState.set(repository.hash, merge(currentState, newValues))
+    const newState = merge(currentState, newValues)
+
+    const isSameLastLocalCommit =
+      currentState.localCommitSHAs.length > 0 &&
+      newState.localCommitSHAs.length > 0 &&
+      currentState.localCommitSHAs[0] === newState.localCommitSHAs[0]
+
+    // Only keep the "is amending" state if the last local commit hasn't changed
+    // and there is no "fixing conflicts" state.
+    const newIsAmending =
+      newState.isAmending &&
+      isSameLastLocalCommit &&
+      newState.changesState.conflictState === null
+
+    this.repositoryState.set(repository.hash, {
+      ...newState,
+      isAmending: newIsAmending,
+    })
   }
 
   public updateCompareState<K extends keyof ICompareState>(
@@ -101,12 +121,79 @@ export class RepositoryStateCache {
       return { rebaseState: newState }
     })
   }
+
+  public updateCherryPickState<K extends keyof ICherryPickState>(
+    repository: Repository,
+    fn: (state: ICherryPickState) => Pick<ICherryPickState, K>
+  ) {
+    this.update(repository, state => {
+      const { cherryPickState } = state
+      const newState = merge(cherryPickState, fn(cherryPickState))
+      return { cherryPickState: newState }
+    })
+  }
+
+  public updateMultiCommitOperationUndoState<
+    K extends keyof IMultiCommitOperationUndoState
+  >(
+    repository: Repository,
+    fn: (
+      state: IMultiCommitOperationUndoState | null
+    ) => Pick<IMultiCommitOperationUndoState, K> | null
+  ) {
+    this.update(repository, state => {
+      const { multiCommitOperationUndoState } = state
+      const computedState = fn(multiCommitOperationUndoState)
+      const newState =
+        computedState === null
+          ? null
+          : merge(multiCommitOperationUndoState, computedState)
+      return { multiCommitOperationUndoState: newState }
+    })
+  }
+
+  public updateMultiCommitOperationState<
+    K extends keyof IMultiCommitOperationState
+  >(
+    repository: Repository,
+    fn: (
+      state: IMultiCommitOperationState
+    ) => Pick<IMultiCommitOperationState, K>
+  ) {
+    this.update(repository, state => {
+      const { multiCommitOperationState } = state
+      if (multiCommitOperationState === null) {
+        throw new Error('Cannot update a null state.')
+      }
+
+      const newState = merge(
+        multiCommitOperationState,
+        fn(multiCommitOperationState)
+      )
+      return { multiCommitOperationState: newState }
+    })
+  }
+
+  public initializeMultiCommitOperationState(
+    repository: Repository,
+    multiCommitOperationState: IMultiCommitOperationState
+  ) {
+    this.update(repository, () => {
+      return { multiCommitOperationState }
+    })
+  }
+
+  public clearMultiCommitOperationState(repository: Repository) {
+    this.update(repository, () => {
+      return { multiCommitOperationState: null }
+    })
+  }
 }
 
 function getInitialRepositoryState(): IRepositoryState {
   return {
     commitSelection: {
-      sha: null,
+      shas: [],
       file: null,
       changedFiles: new Array<CommittedFileChange>(),
       diff: null,
@@ -166,9 +253,19 @@ function getInitialRepositoryState(): IRepositoryState {
     remote: null,
     isPushPullFetchInProgress: false,
     isCommitting: false,
+    isAmending: false,
     lastFetched: null,
     checkoutProgress: null,
     pushPullFetchProgress: null,
     revertProgress: null,
+    cherryPickState: {
+      step: null,
+      progress: null,
+      userHasResolvedConflicts: false,
+      targetBranchUndoSha: null,
+      branchCreated: false,
+    },
+    multiCommitOperationUndoState: null,
+    multiCommitOperationState: null,
   }
 }

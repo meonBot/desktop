@@ -13,6 +13,7 @@ import { DiffSelectionType } from '../../models/diff'
 import { CommitIdentity } from '../../models/commit-identity'
 import { ICommitMessage } from '../../models/commit-message'
 import { Repository } from '../../models/repository'
+import { Account } from '../../models/account'
 import { IAuthor } from '../../models/author'
 import { List, ClickSource } from '../lib/list'
 import { Checkbox, CheckboxValue } from '../lib/checkbox'
@@ -30,7 +31,7 @@ import { showContextualMenu } from '../main-process-proxy'
 import { arrayEquals } from '../../lib/equality'
 import { clipboard } from 'electron'
 import { basename } from 'path'
-import { ICommitContext } from '../../models/commit'
+import { Commit, ICommitContext } from '../../models/commit'
 import { RebaseConflictState, ConflictState } from '../../lib/app-state'
 import { ContinueRebase } from './continue-rebase'
 import { Octicon, OcticonSymbol } from '../octicons'
@@ -97,7 +98,9 @@ function getIncludeAllValue(
 
 interface IChangesListProps {
   readonly repository: Repository
+  readonly repositoryAccount: Account | null
   readonly workingDirectory: WorkingDirectoryStatus
+  readonly mostRecentLocalCommit: Commit | null
   /**
    * An object containing the conflicts in the working directory.
    * When null it means that there are no conflicts.
@@ -137,6 +140,7 @@ interface IChangesListProps {
   readonly dispatcher: Dispatcher
   readonly availableWidth: number
   readonly isCommitting: boolean
+  readonly isAmending: boolean
   readonly currentBranchProtected: boolean
 
   /**
@@ -186,6 +190,8 @@ interface IChangesListProps {
    * arrow pointing at the commit summary box
    */
   readonly shouldNudgeToCommit: boolean
+
+  readonly commitSpellcheckEnabled: boolean
 }
 
 interface IChangesState {
@@ -501,8 +507,7 @@ export class ChangesList extends React.Component<
         })
       })
 
-    const enabled = isSafeExtension && status.kind !== AppFileStatusKind.Deleted
-
+    const enabled = status.kind !== AppFileStatusKind.Deleted
     items.push(
       { type: 'separator' },
       this.getCopyPathMenuItem(file),
@@ -511,7 +516,7 @@ export class ChangesList extends React.Component<
       {
         label: OpenWithDefaultProgramLabel,
         action: () => this.props.onOpenItem(path),
-        enabled,
+        enabled: enabled && isSafeExtension,
       }
     )
 
@@ -534,7 +539,7 @@ export class ChangesList extends React.Component<
       })
     }
 
-    const enabled = isSafeExtension && status.kind !== AppFileStatusKind.Deleted
+    const enabled = status.kind !== AppFileStatusKind.Deleted
 
     items.push(
       this.getCopyPathMenuItem(file),
@@ -543,7 +548,7 @@ export class ChangesList extends React.Component<
       {
         label: OpenWithDefaultProgramLabel,
         action: () => this.props.onOpenItem(path),
-        enabled,
+        enabled: enabled && isSafeExtension,
       }
     )
 
@@ -603,8 +608,10 @@ export class ChangesList extends React.Component<
       rebaseConflictState,
       workingDirectory,
       repository,
+      repositoryAccount,
       dispatcher,
       isCommitting,
+      isAmending,
       currentBranchProtected,
     } = this.props
 
@@ -659,11 +666,13 @@ export class ChangesList extends React.Component<
         commitAuthor={this.props.commitAuthor}
         anyFilesSelected={anyFilesSelected}
         repository={repository}
+        repositoryAccount={repositoryAccount}
         dispatcher={dispatcher}
         commitMessage={this.props.commitMessage}
         focusCommitMessage={this.props.focusCommitMessage}
         autocompletionProviders={this.props.autocompletionProviders}
         isCommitting={isCommitting}
+        commitToAmend={isAmending ? this.props.mostRecentLocalCommit : null}
         showCoAuthoredBy={this.props.showCoAuthoredBy}
         coAuthors={this.props.coAuthors}
         placeholder={this.getPlaceholderMessage(
@@ -675,6 +684,9 @@ export class ChangesList extends React.Component<
         showBranchProtected={fileCount > 0 && currentBranchProtected}
         showNoWriteAccess={fileCount > 0 && !hasWritePermissionForRepository}
         shouldNudge={this.props.shouldNudgeToCommit}
+        commitSpellcheckEnabled={this.props.commitSpellcheckEnabled}
+        persistCoAuthors={true}
+        persistCommitMessage={true}
       />
     )
   }
@@ -776,7 +788,10 @@ export class ChangesList extends React.Component<
           selectedRows={this.state.selectedRows}
           selectionMode="multi"
           onSelectionChanged={this.props.onFileSelectionChanged}
-          invalidationProps={this.props.workingDirectory}
+          invalidationProps={{
+            workingDirectory: this.props.workingDirectory,
+            isCommitting: this.props.isCommitting,
+          }}
           onRowClick={this.props.onRowClick}
           onScroll={this.onScroll}
           setScrollTop={this.props.changesListScrollTop}
