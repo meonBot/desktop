@@ -1,8 +1,8 @@
 # [GitHub Desktop](https://desktop.github.com)
 
-GitHub Desktop is an open source [Electron](https://electron.atom.io)-based
-GitHub app. It is written in [TypeScript](http://www.typescriptlang.org) and
-uses [React](https://facebook.github.io/react/).
+[GitHub Desktop](https://desktop.github.com/) is an open source [Electron](https://www.electronjs.org/)-based
+GitHub app. It is written in [TypeScript](https://www.typescriptlang.org) and
+uses [React](https://reactjs.org/).
 
 ![GitHub Desktop screenshot - Windows](https://cloud.githubusercontent.com/assets/359239/26094502/a1f56d02-3a5d-11e7-8799-23c7ba5e5106.png)
 
@@ -11,15 +11,19 @@ uses [React](https://facebook.github.io/react/).
 Download the official installer for your operating system:
 
  - [macOS](https://central.github.com/deployments/desktop/desktop/latest/darwin)
+ - [macOS (Apple silicon)](https://central.github.com/deployments/desktop/desktop/latest/darwin-arm64)
  - [Windows](https://central.github.com/deployments/desktop/desktop/latest/win32)
  - [Windows machine-wide install](https://central.github.com/deployments/desktop/desktop/latest/win32?format=msi)
 
 You can install this alongside your existing GitHub Desktop for Mac or GitHub
 Desktop for Windows application.
 
-**NOTE**: there is no current migration path to import your existing
+Linux is not officially supported; however, you can find installers created for Linux from a fork of GitHub Desktop in the [Community Releases](https://github.com/desktop/desktop#community-releases) section.
+
+**NOTE**: There is no current migration path to import your existing
 repositories into the new application - you can drag-and-drop your repositories
 from disk onto the application to get started.
+
 
 ### Beta Channel
 
@@ -27,7 +31,11 @@ Want to test out new features and get fixes before everyone else? Install the
 beta channel to get access to early builds of Desktop:
 
  - [macOS](https://central.github.com/deployments/desktop/desktop/latest/darwin?env=beta)
+ - [macOS (Apple silicon)](https://central.github.com/deployments/desktop/desktop/latest/darwin-arm64?env=beta)
  - [Windows](https://central.github.com/deployments/desktop/desktop/latest/win32?env=beta)
+ - [Windows (ARM64)](https://central.github.com/deployments/desktop/desktop/latest/win32-arm64?env=beta)
+
+The release notes for the latest beta versions are available [here](https://desktop.github.com/release-notes/?env=beta).
 
 ### Community Releases
 
@@ -36,7 +44,7 @@ install GitHub Desktop:
  - Windows users can install using [Chocolatey](https://chocolatey.org/) package manager:
       `c:\> choco install github-desktop`
  - macOS users can install using [Homebrew](https://brew.sh/) package manager:
-      `$ brew cask install github`
+      `$ brew install --cask github`
 
 Installers for various Linux distributions can be found on the
 [`shiftkey/desktop`](https://github.com/shiftkey/desktop) fork.
@@ -81,6 +89,9 @@ If you're looking for something to work on, check out the [help wanted](https://
 
 See [desktop.github.com](https://desktop.github.com) for more product-oriented
 information about GitHub Desktop.
+
+
+See our [getting started documentation](https://docs.github.com/en/desktop/installing-and-configuring-github-desktop/overview/getting-started-with-github-desktop) for more information on how to set up, authenticate, and configure GitHub Desktop.
 
 ## License
 
